@@ -25,8 +25,9 @@
          (num-of-variables (length lambda-list))
          (num-of-rows (expt 2 num-of-variables)))
     
-    (format t " ~{~A~}~%"  lambda-list)
+    (format t "~{~A ~}~%"  lambda-list)
 
     (dotimes (x num-of-rows)
-      (format t "~vb | ~a~%" num-of-variables x
+      (format t "~{~A~} | ~a~%" (mapcar #'bool->bit (split-bit x num-of-variables))
               (bool->bit (apply function (split-bit x num-of-variables)))))))
+
