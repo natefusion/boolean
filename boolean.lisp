@@ -8,6 +8,65 @@
 (defun bool->bit (x)
   (if x 1 0))
 
+(defparameter *binary-operators* '((or 1) (and 2) (xor 2)))
+(defparameter *unary-operators* '((not 4)))
+
+(defun weight (c) (second (assoc c *binary-operators*)))
+(defun binary-opcode (c) (first (assoc c *binary-operators*)))
+(defun unary-opcode (c) (first (assoc c *unary-operators*)))
+
+(defun inf-iter (exp operators operands)
+  (cond ((and (null exp) (null operators))
+         (first operands))
+
+        ;; implicit multiplication
+        ((and exp (or (listp (first exp))
+                      (null (weight (first exp)))))
+         (inf-iter (cons 'and exp) operators operands))
+
+        ((and exp (or (null operators)
+                      (> (weight (first exp)) (weight (first operators)))))
+         (inf-aux (rest exp) (cons (first exp) operators) operands))
+
+        (t
+         (inf-iter exp (rest operators)
+                   (cons (list (binary-opcode (first operators))
+                               (cadr operands) (first operands))
+                         (cddr operands))))))
+
+(defun inf-aux (exp operators operands)
+  (if (and (atom (first exp)) (assoc (first exp) *unary-operators*))
+      (inf-iter (cddr exp) operators
+                (cons (list (unary-opcode (first exp))
+                            (infix->prefix (cadr exp)))
+                      operands))
+      (inf-iter (rest exp) operators (cons (infix->prefix (first exp)) operands))))
+
+(defun infix->prefix (exp)
+  (if (atom exp)
+      exp
+      (inf-aux exp nil nil)))
+
+(defun notation (exp)
+  (let (final stack variables)
+    (loop for x across exp
+          do (case x
+               ((#\') (rplaca final (list 'not (car final))))
+               ((#\+) (push 'or final))
+               ((#\*) (push 'and final))
+               ((#\^) (push 'xor final))
+               ((#\() (push final stack) (setf final nil))
+               ((#\)) (push final (first stack)) (setf final (pop stack)))
+               (t (when (alpha-char-p x)
+                    (push (read-from-string (string x)) final)
+                    (pushnew x variables))))
+          finally (return (list (mapcar (lambda (x) (read-from-string (string x)))
+                                        (sort variables #'char<=))
+                                (infix->prefix final))))))
+
+(defmacro bool-def (name exp)
+  `(defun ,name ,@(notation exp)))
+
 (defun the-same (f1 f2)
   (let ((num-of-variables-f1 (length (sb-introspect:function-lambda-list f1)))
         (num-of-variables-f2 (length (sb-introspect:function-lambda-list f2))))
