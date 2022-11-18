@@ -57,9 +57,12 @@
                ((#\^) (push 'xor final))
                ((#\() (push final stack) (setf final nil))
                ((#\)) (push final (first stack)) (setf final (pop stack)))
-               (t (when (alpha-char-p x)
-                    (push (read-from-string (string x)) final)
-                    (pushnew x variables))))
+               ((#\0) (push nil final))
+               ((#\1) (push t final))
+               (t (if (alpha-char-p x)
+                      (progn (push (read-from-string (string x)) final)
+                             (pushnew x variables))
+                      (error "wot in tarnation is '~a' doing here" x))))
           finally (return (list (mapcar (lambda (x) (read-from-string (string x)))
                                         (sort variables #'char<=))
                                 (infix->prefix final))))))
@@ -87,6 +90,6 @@
     (format t "~{~A ~}~%"  lambda-list)
 
     (dotimes (x num-of-rows)
-      (format t "~{~A~} | ~a~%" (mapcar #'bool->bit (split-bit x num-of-variables))
+      (format t "~{~A ~}| ~a~%" (mapcar #'bool->bit (split-bit x num-of-variables))
               (bool->bit (apply function (split-bit x num-of-variables)))))))
 
