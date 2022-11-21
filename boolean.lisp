@@ -59,6 +59,7 @@
                ((#\)) (push final (first stack)) (setf final (pop stack)))
                ((#\0) (push nil final))
                ((#\1) (push t final))
+               ((#\space))
                (t (if (alpha-char-p x)
                       (progn (push (read-from-string (string x)) final)
                              (pushnew x variables))
