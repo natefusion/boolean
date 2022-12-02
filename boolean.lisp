@@ -47,7 +47,17 @@
       exp
       (inf-aux exp nil nil)))
 
-(defun notation (exp)
+(defun vars (symbol)
+  (case symbol
+    (a 1) (b 2) (c 3) (d 4) (e 5) (f 6) (g 7) (h 8) (i 9) (j 10)
+    (k 11) (l 12) (m 13) (n 14) (o 15) (p 16) (q 17) (r 18) (s 19) ((t) 20)
+    (u 21) (v 22) (w 23) (x 24) (y 25) (z 26)
+    (t (error "'~a' is not a valid variable" symbol))))
+
+(defun var<= (symbol1 symbol2)
+  (<= (vars symbol1) (vars symbol2)))
+
+(defun notation (exp &optional vars)
   (let (final stack variables)
     (loop for x across exp
           do (case x
@@ -62,14 +72,15 @@
                ((#\space))
                (t (if (alpha-char-p x)
                       (progn (push (read-from-string (string x)) final)
-                             (pushnew x variables))
+                             (pushnew (car final) variables))
                       (error "wot in tarnation is '~a' doing here" x))))
           finally (return (list (mapcar (lambda (x) (read-from-string (string x)))
-                                        (sort variables #'char<=))
+                                        (sort (union vars variables) #'var<=))
                                 (infix->prefix final))))))
 
-(defmacro bool-def (name exp)
-  `(defun ,name ,@(notation exp)))
+(defmacro bool-def (name exp &rest vars)
+  `(defun ,name
+       ,@(notation exp vars)))
 
 (defun the-same (f1 f2)
   (let ((num-of-variables-f1 (length (sb-introspect:function-lambda-list f1)))
