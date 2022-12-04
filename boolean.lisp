@@ -94,10 +94,10 @@
                   (apply f2 (split-bit x num-of-variables-f1)))
         (return-from the-same nil)))))
 
-(defun truth-table (function)
+(defun truth-table (function &optional range)
   (let* ((lambda-list (sb-introspect:function-lambda-list function))
          (num-of-variables (length lambda-list))
-         (num-of-rows (expt 2 num-of-variables)))
+         (num-of-rows (if range range (expt 2 num-of-variables))))
     
     (format t "~{~A ~}~%"  lambda-list)
 
