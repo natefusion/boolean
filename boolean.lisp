@@ -57,8 +57,6 @@
 (defun var<= (symbol1 symbol2)
   (<= (vars symbol1) (vars symbol2)))
 
-
-
 (defun notation (exp &optional vars)
   (let (final stack variables)
     (loop for x across exp
@@ -79,14 +77,6 @@
           finally (return (list (mapcar (lambda (x) (read-from-string (string x)))
                                         (sort (union vars variables) #'var<=))
                                 (infix->prefix final))))))
-
-;; this is only useful when using a prefix not (~a)
-;; this is not useful when using a postfix not (a')
-(defun recursive-reverse (l)
-  (when l (append (recursive-reverse (cdr l))
-                  (list (if (listp (car l))
-                            (recursive-reverse (car l))
-                            (car l))))))
 
 (defun notation-alt (exp &optional vars)
   (let (final stack variables)
@@ -118,12 +108,22 @@
                ((#\f #\c) (push nil final))
                ((#\space))
                (t (if (alpha-char-p x)
-                      (progn (push (read-from-string (string x)) final)
-                             (pushnew (car final) variables))
+                      ;; I need to swap the variable and not here
+                      ;; If I don't ~a will be '(a not)
+                      ;; Rather than '(not a)
+                      ;; there is probably a better way to do this
+                      (cond ((eql (car final) 'not)
+                             (pop final)
+                             (push (read-from-string (string x)) final)
+                             (pushnew (car final) variables)
+                             (push 'not final))
+                            (t
+                             (push (read-from-string (string x)) final)
+                             (pushnew (car final) variables)))
                       (error "wot in tarnation is '~a' doing here" x))))
           finally (return (list (mapcar (lambda (x) (read-from-string (string x)))
                                         (sort (union vars variables) #'var<=))
-                                (infix->prefix (recursive-reverse final)))))))
+                                (infix->prefix final))))))
 
 (defmacro bool-def (name exp &rest vars)
   `(defun ,name
