@@ -293,21 +293,21 @@
                     (first-pass (cdr exp) (car exp)))
                    (t (let ((next (first-pass (cdr exp) op)))
                         (cons (first-pass (car exp)) (when next (cons op next)))))))
-           (second-pass (exp)
+           (second-pass (exp recurring?)
              (if (listp exp)
                  (if (= 1 (length exp))
                      (format t "~a'" (car exp))
-                     (loop initially (unless (eq (second exp) 'and) (format t "("))
+                     (loop initially (unless (or (not recurring?) (eq (second exp) 'and)) (format t "("))
                            for x in exp
-                           do (second-pass x)
-                           finally (unless (eq (second exp) 'and) (format t ")"))))
+                           do (second-pass x t)
+                           finally (unless (or (not recurring?) (eq (second exp) 'and)) (format t ")"))))
                  (case exp
                    (and
                     ;; do nothing
                     )                
                    (or (format t "+"))
                    (t (format t "~a" exp))))))
-    (second-pass (first-pass exp))))
+    (second-pass (first-pass exp) nil)))
 
 (defun super-apply (functions argument)
   (if (null functions)
