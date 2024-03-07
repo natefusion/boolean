@@ -128,8 +128,6 @@
                (loop for x in (rest lhs)
                      for y in (rest expr)
                      do (if (atom x)
-                            ;; t and nil are not variables
-                            ;; they must match exactly!!!
                             (if (t-and-nil-check x y)
                                 (pushnew (cons x y) vars
                                          ;; aaaaah
