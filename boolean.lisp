@@ -114,53 +114,53 @@
       (format t "~{~A ~}| ~a~%" (mapcar #'bool->bit (split-bit x num-of-variables))
               (bool->bit (apply function (split-bit x num-of-variables)))))))
 
-(defun collect-vars (lhs expr &optional vars)
-  (cond ((and (consp expr) (consp lhs))
-         (loop initially (unless (eq (car lhs) (car expr)) (return nil))
-               for x in (rest lhs)
-               for y in (rest expr)
-               do (if (atom x)
-                      ;; t and nil are not variables
-                      ;; they must match exactly!!!
-                      (if (or (and (eq x t)
-                                   (not (eq y t)))
-                              (and (eq x nil)
-                                   (not (eq y nil))))
-                          (return nil)
-                          (pushnew `(,x . ,y) vars
-                                   ;; aaaaah
-                                   ;; this fixes the idempotent case
-                                   ;; when the expression is not idempotent
-                                   ;; lhs:    x^x
-                                   ;; expr:   a^b
-                                   ;; !! x cannot equal a and b at the same time !!
-                                   ;; result: a^b
-                                   ;; ------
-                                   ;; lhs:    x^x
-                                   ;; expr:   a^a
-                                   ;; !! x equals a and x equals a. all good !!
-                                   ;; result: a
-                                   :test (lambda (x y)
-                                           (if (eq (car x) (car y))
-                                               (if (tree-equal (cdr x) (cdr y))
-                                                   t
-                                                   (return-from collect-vars nil))
-                                               nil))))
-                      (setf vars (collect-vars x y vars)))
-               finally (return vars)))
-        ;; is this right?? seems so
-        ((consp lhs)
-         nil)
-        ;; this branch ~shouldn't~ ever be taken in a recursive callp
-        (t
-         ;; t and nil are not variables
-         ;; they must match exactly!!!
-         (if (or (and (eq lhs t)
-                      (not (eq expr t)))
-                 (and (eq lhs nil)
-                      (not (eq expr nil))))
-             nil
-             `((,lhs . ,expr))))))
+(defun collect-vars (lhs expr)
+  (let ((vars nil))
+    (labels ((same-operation (x y)
+               (and (consp x) (consp y) (eq (car x) (car y))))
+             (t-and-nil-check (x y)
+               "t and nil are not variables, they must match exactly"
+               (and (or (not (eq x t))
+                        (eq y t))
+                    (or (not (eq x nil))
+                        (eq y nil))))
+             (recur (lhs expr)
+               (loop for x in (rest lhs)
+                     for y in (rest expr)
+                     do (if (atom x)
+                            ;; t and nil are not variables
+                            ;; they must match exactly!!!
+                            (if (t-and-nil-check x y)
+                                (pushnew (cons x y) vars
+                                         ;; aaaaah
+                                         ;; this fixes the idempotent case
+                                         ;; when the expression is not idempotent
+                                         ;; lhs:    x^x
+                                         ;; expr:   a^b
+                                         ;; !! x cannot equal a and b at the same time !!
+                                         ;; result: a^b
+                                         ;; ------
+                                         ;; lhs:    x^x
+                                         ;; expr:   a^a
+                                         ;; !! x equals a and x equals a. all good !!
+                                         ;; result: a
+                                         :test (lambda (x y)
+                                                 (if (eq (car x) (car y))
+                                                     (if (tree-equal (cdr x) (cdr y))
+                                                         t
+                                                         (return-from collect-vars nil))
+                                                     nil)))
+                                (return-from collect-vars nil))
+                            (if (same-operation x y)
+                                (recur x y)
+                                (return-from collect-vars nil))))))
+      (cond ((same-operation lhs expr)
+             (recur lhs expr)
+             vars)
+            ((t-and-nil-check lhs expr)
+             (list (cons lhs expr)))
+            (t
+             nil)))))
 
 (defun rewrite-vars (rhs vars)
   (cond ((null rhs)
@@ -179,17 +179,19 @@
                else
                  collect x))))
 
+(defun fancy-term-rewriter (lhs rhs expr)
+  (let ((vars (collect-vars lhs expr)))
+    (if vars
+        (values (rewrite-vars rhs vars) t)
+        (values expr nil))))
+
 (defmacro defaxiom (name lhs rhs)
   `(defun ,name (expr &optional reverse)
      (let ((lhs ',(notate lhs))
            (rhs ',(notate rhs)))
-       (when reverse (rotatef lhs rhs))
-       (let ((vars (collect-vars lhs expr))) 
-         (if vars
-             (values (rewrite-vars rhs vars) t)
-             ;; nil means false, but it also means the function failed
-             ;; this is the reconciliation for that
-             (values expr nil))))))
+       (if (not reverse)
+           (fancy-term-rewriter lhs rhs expr)
+           (fancy-term-rewriter rhs lhs expr)))))
 
 ;; https://en.wikipedia.org/wiki/Boolean_algebra#Laws
 ;; https://en.wikipedia.org/wiki/Rewriting
@@ -233,10 +235,10 @@
              (if (listp exp)
                  (if (= 1 (length exp))
                      (format t "~a'" (car exp))
-                     (loop initially (unless (or (not recurring?) (eq (second exp) 'and)) (format t "("))
+                     (loop initially (unless (not recurring?) (format t "("))
                            for x in exp
                            do (second-pass x t)
-                           finally (unless (or (not recurring?) (eq (second exp) 'and)) (format t ")"))))
+                           finally (unless (not recurring?) (format t ")"))))
                  (case exp
                    (and
                     ;; do nothing
@@ -252,12 +254,3 @@
 
 (defmacro transform (expression &body transformations-to-apply)
   `(prefix->infix ,(super-apply (reverse transformations-to-apply) `',(notate expression))))
-
-(defun flatten (lst rule)
-  (labels ((rflatten (lst1 acc)
-             (dolist (el lst1)
-               (if (funcall rule el)
-                   (setf acc (rflatten (cdr el) acc))
-                   (push el acc)))
-             acc))
-    (reverse (rflatten (cdr lst) nil))))
