@@ -235,10 +235,9 @@
              (if (listp exp)
                  (if (= 1 (length exp))
                      (format t "~a'" (car exp))
-                     (loop initially (unless (not recurring?) (format t "("))
-                           for x in exp
-                           do (second-pass x t)
-                           finally (unless (not recurring?) (format t ")"))))
+                     (loop initially (when recurring? (format t "("))
+                           for x in exp do (second-pass x t)
+                           finally   (when recurring? (format t ")"))))
                  (case exp
                    (and
                     ;; do nothing
