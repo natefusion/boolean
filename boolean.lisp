@@ -87,62 +87,9 @@
 (defun notate (exp &optional vars)
   (second (notation exp vars)))
 
-;; modify this to work with the pratt parser
-;; (defun notation-alt (exp &optional vars)
-;;   (let (final stack variables)
-;;     (loop for i from 0 below (length exp)
-;;           for x = (char exp i)
-;;           do (case x
-;;                ((#\~) (push 'not final))
-;;                ((#\^) (push 'and final))
-;;                ((#\v #\V) (push 'or final))
-;;                ((#\>)
-;;                 (push 'not final)
-;;                 (push 'or final))
-;;                ((#\<)
-;;                 (if (< i (- (length exp) 2))
-;;                     (if (char= (char exp (1+ i)) #\>)
-;;                         (let ((lhs (car final))
-;;                               ;; wow baddddd
-;;                               (rhs (read-from-string (string (char exp (+ 2 i))))))
-;;                           (push 'not final)
-;;                           (push rhs final)
-;;                           (push 'not final)
-;;                           (push 'or final)
-;;                           (push lhs final)
-;;                           (push rhs final)
-;;                           (pushnew rhs variables) ;; lame
-;;                           (incf i 2)))))
-;;                ((#\() (push final stack) (setf final nil))
-;;                ((#\)) (push final (first stack)) (setf final (pop stack)))
-;;                ((#\f #\c) (push nil final))
-;;                ((#\space))
-;;                (t (if (alpha-char-p x)
-;;                       ;; I need to swap the variable and not here
-;;                       ;; If I don't ~a will be '(a not)
-;;                       ;; Rather than '(not a)
-;;                       ;; there is probably a better way to do this
-;;                       (cond ((eql (car final) 'not)
-;;                              (pop final)
-;;                              (push (read-from-string (string x)) final)
-;;                              (pushnew (car final) variables)
-;;                              (push 'not final))
-;;                             (t
-;;                              (push (read-from-string (string x)) final)
-;;                              (pushnew (car final) variables)))
-;;                       (error "wot in tarnation is '~a' doing here" x))))
-;;           finally (return (list (mapcar (lambda (x) (read-from-string (string x)))
-;;                                         (sort (union vars variables) #'var<=))
-;;                                 (infix->prefix final))))))
-
 (defmacro bool-def (name exp &rest vars)
   `(defun ,name
        ,@(notation exp vars)))
-
-;; notation-alt should work
-;; (defmacro bool-def-alt (name exp &rest vars)
-;;   `(defun ,name
-;;      ,@(notation-alt exp vars)))
 
 (defun the-same (f1 f2)
   (let ((num-of-variables-f1 (length (sb-introspect:function-lambda-list f1)))
