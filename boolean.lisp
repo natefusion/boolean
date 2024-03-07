@@ -1,3 +1,8 @@
+(defpackage boolean
+  (:use :cl))
+
+(in-package :boolean)
+
 (defun xor (x y)
   (or (and (not x) y) (and x (not y))))
 
@@ -162,22 +167,6 @@
       (format t "~{~A ~}| ~a~%" (mapcar #'bool->bit (split-bit x num-of-variables))
               (bool->bit (apply function (split-bit x num-of-variables)))))))
 
-(defun lhs (exp) (and (listp exp) (second exp)))
-(defun rhs (exp) (and (listp exp) (third exp)))
-(defun operand (exp) (and (listp exp) (second exp)))
-(defun operator (exp) (and (listp exp) (first exp)))
-
-(defun andp (exp) (and (listp exp) (eq (first exp) 'and)))
-(defun orp  (exp) (and (listp exp) (eq (first exp) 'or)))
-(defun xorp (exp) (and (listp exp) (eq (first exp) 'xor)))
-(defun notp (exp) (and (listp exp) (eq (first exp) 'not)))
-
-(defun expr-structure-eq (a b)
-  (not (or (and (not (listp a)) (not (listp b)))
-           (not (eq (first a) (first b)))
-           (or (not (eq (second a) (second b)))
-               (not (eq (third a) (third b)))))))
-
 (defun collect-vars (lhs expr &optional vars)
   (cond ((and (consp expr) (consp lhs))
          (loop initially (unless (eq (car lhs) (car expr)) (return nil))
@@ -325,121 +314,3 @@
                    (push el acc)))
              acc))
     (reverse (rflatten (cdr lst) nil))))
-
-(defun absorption-law-p (a b)
-  (or (exp-eq a (lhs b))
-      (exp-eq a (rhs b))))
-
-(defun commutative-p (a b)
-  (and (exp-eq (lhs a) (lhs b))
-       (exp-eq (rhs a) (rhs b)))
-  (and (exp-eq (lhs a) (rhs b))
-       (exp-eq (rhs a) (lhs b))))
-
-(defun and-associative-p (a b)
-  ;; I call make-and here to ensure that the lhs is another and operation, and not just a symbol
-  (exp-eq a (make-and (lhs (lhs b)) (make-and (rhs (lhs b)) (rhs b)))))
-
-(defun or-associative-p (a b)
-  ;; I call make-or here for the same reason as in and-associative-p
-  (exp-eq a (make-or (lhs (lhs b)) (make-or (rhs (lhs b)) (rhs b)))))
-
-(defun exp-eq (a b)
-  (cond ((and (orp a) (orp b))
-         (or (commutative-p a b)
-             (or-associative-p a b)))
-
-        ((and (andp a) (andp b))
-         (or (commutative-p a b)
-             (and-associative-p a b)))
-        ((and (notp a) (notp b))
-         (exp-eq (operand a) (operand b)))
-        (t
-         (eq a b))))
-
-(defun complementp (a b)
-  (cond ((notp a)
-         (exp-eq (operand a) b))
-        ((notp b)
-         (exp-eq (operand b) a))
-        (t
-         nil)))
-
-(defun make-and (a b)
-  (cond ((exp-eq a b)
-         a)
-        ((complementp a b)
-         nil)
-        ((eq 't b)
-         a)
-        ((eq 't a)
-         b)
-        ((or (null a) (null b))
-         nil)
-        ((and (andp a) (andp b))
-         (make-and (make-and a (lhs b)) (rhs b)))
-        ((and (or (notp a) (symbolp a)) (or (andp b) (orp b)))
-         (make-and b a))
-        ;; ((and (andp a) (not (symbolp b)))
-        ;;  (make-and (make-and b (lhs a)) (rhs a)))
-        ;; ((and (not (symbolp a)) (andp b))
-        ;;  (make-and (make-and a (lhs b)) (rhs b)))
-        ;; ((orp a)
-        ;;  (make-or (make-and (lhs a) b) (make-and (rhs a) b)))
-        ;; ((orp b)
-        ;;  (make-or (make-and a (lhs b)) (make-and a (rhs b))))
-        ;; ((and (andp a) (symbolp b) (find b (flatten a #'andp)))
-        ;;  a)
-        (t `(and ,a ,b))))
-
-(defun make-or (a b)
-  (cond ((exp-eq a b) a)
-        ((complementp a b)
-         t)
-        ((null a)                       ; identity
-         b)
-        ((null b)                       ; identity
-         a)
-        ((or (eq 't a) (eq 't b))
-         t)
-        ((and (orp a) (orp b))
-         (make-or (make-or a (lhs b)) (rhs b)))
-        ((and (or (notp a) (symbolp a)) (or (andp b) (orp b)))
-         (make-or b a))
-        ((andp a)
-         (cond ((exp-eq (lhs a) b)
-                (lhs a))
-               ((exp-eq (rhs a) b)
-                (rhs a))
-               ((complementp (lhs a) b)
-                (make-or (rhs a) b))
-               ((complementp (rhs a) b)
-                (make-or (lhs a) b))
-               (t
-                `(or ,a ,b))))
-        (t
-         `(or ,a ,b))))
-
-(defun make-not (a)
-  (cond ((notp a)
-         (operand a))
-        ((eql 't a)
-         nil)
-        ((null a)
-         t)
-        ((andp a)
-         (make-or (make-not (lhs a)) (make-not (rhs a))))
-        (t
-         `(not ,a))))
-
-(defun simplify (exp)
-  (cond ((andp exp)
-         (make-and (simplify (lhs exp))
-                   (simplify (rhs exp))))
-        ((orp exp)
-         (make-or (simplify (lhs exp))
-                  (simplify (rhs exp))))
-        ((notp exp)
-         (make-not (simplify (operand exp))))
-        (t exp)))
-
