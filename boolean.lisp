@@ -118,18 +118,15 @@
   (let ((vars nil))
     (labels ((same-operation (x y)
                (and (consp x) (consp y) (eq (car x) (car y))))
-             (t-and-nil-check (x y)
-               "t and nil are not variables, they must match exactly"
-               (and (or (not (eq x t))
-                        (eq y t))
-                    (or (not (eq x nil))
-                        (eq y nil))))
              (recur (lhs expr)
                (loop for x in (rest lhs)
                      for y in (rest expr)
                      do (if (atom x)
-                            (if (t-and-nil-check x y)
-                                (pushnew (cons x y) vars
+                            (if (and (or (not (eq x t))
+                                         (eq y t))
+                                     (or (not (eq x nil))
+                                         (eq y nil)))
+                                (pushnew (cons x y) vars 
                                          ;; aaaaah
                                          ;; this fixes the idempotent case
                                          ;; when the expression is not idempotent
@@ -155,7 +152,10 @@
       (cond ((same-operation lhs expr)
              (recur lhs expr)
              vars)
-            ((t-and-nil-check lhs expr)
+            ((if (eq lhs t)
+                 (eq expr t)
+                 (if (eq lhs nil)
+                     (eq expr nil)))
              (list (cons lhs expr)))
             (t
              nil)))))
@@ -245,9 +245,16 @@
     (second-pass (first-pass exp) nil)))
 
 (defun super-apply (functions argument)
-  (if (null functions)
-      argument
-      (list (car functions) (super-apply (cdr functions) argument))))
+  (labels ((recur (functions argument)
+             (if (null functions)
+                 `(return (values ,argument t))
+                 `(multiple-value-bind (result ok) ,(list (car functions) argument)
+                    (if (not ok)
+                        (return (values result nil))
+                        ,(recur (cdr functions) 'result))))))
+    `(block nil ,(recur functions argument))))
 
 (defmacro transform (expression &body transformations-to-apply)
-  `(prefix->infix ,(super-apply (reverse transformations-to-apply) `',(notate expression))))
+  `(multiple-value-bind (result ok) ,(super-apply transformations-to-apply `',(notate expression))
+     (prefix->infix result)
+     ok))
